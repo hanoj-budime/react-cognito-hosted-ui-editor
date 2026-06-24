@@ -1,1 +1,0 @@
-# react-cognito-hosted-ui-editor
