@@ -9,11 +9,20 @@ const SCOPE_OPTIONS = [
   "aws.cognito.signin.user.admin",
 ];
 
+const ROUTE_PATH_OPTIONS = [
+  "/login",
+  "/oauth2/authorize",
+  "/logout",
+  "/signup",
+];
+
 export default function App() {
   const faviconSrc = `${import.meta.env.BASE_URL}favicon.svg`;
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [rawUrl, setRawUrl] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [cognitoDomain, setCognitoDomain] = useState("");
+  const [routePath, setRoutePath] = useState("/login");
   const [params, setParams] = useState<CognitoParams>({
     response_type: "code",
     client_id: "",
@@ -33,6 +42,8 @@ export default function App() {
     try {
       const u = new URL(url);
       setBaseUrl(u.origin + u.pathname);
+      setCognitoDomain(u.origin);
+      setRoutePath(ROUTE_PATH_OPTIONS.includes(u.pathname) ? u.pathname : "/login");
 
       const scope = u.searchParams.get("scope");
       setParams({
@@ -49,13 +60,15 @@ export default function App() {
 
   /** Generate final Hosted UI URL */
   function generateUrl() {
-    if (!baseUrl || !params.client_id || !params.redirect_uri) {
+    const resolvedBaseUrl = cognitoDomain ? `${cognitoDomain}${routePath}` : baseUrl;
+
+    if (!resolvedBaseUrl || !params.client_id || !params.redirect_uri) {
       alert("Please fill in the required fields: Base URL, Client ID, and Redirect URI.");
       return;
     }
 
     try {
-      const url = new URL(baseUrl.includes("?") ? baseUrl.split("?")[0] : baseUrl);
+      const url = new URL(resolvedBaseUrl.includes("?") ? resolvedBaseUrl.split("?")[0] : resolvedBaseUrl);
       url.searchParams.set("response_type", params.response_type);
       url.searchParams.set("client_id", params.client_id);
       url.searchParams.set("redirect_uri", params.redirect_uri);
@@ -121,33 +134,44 @@ export default function App() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-3 sm:p-4 lg:p-5">
+      <div className="max-w-6xl mx-auto p-3 sm:p-4 lg:p-5">
         {/* URL Input Section */}
-        <div className="glass-card rounded-xl p-4 sm:p-5 mb-4 fade-in">
-          <label className={`block font-semibold mb-2.5 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="text-lg">📋</span>
-            Paste Hosted UI URL
-          </label>
-          <textarea
-            className={`w-full p-3 rounded-lg input-field font-mono text-sm ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-900'}`}
-            rows={2}
-            placeholder="https://your-domain.auth.region.amazoncognito.com/login?..."
-            value={rawUrl}
-            onChange={(e) => {
-              setRawUrl(e.target.value);
-              parseUrl(e.target.value);
-            }}
-          />
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {/* Configuration Form */}
+          <div className="glass-card rounded-xl p-4 sm:p-5 fade-in order-2 lg:order-1 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+            <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <span className="bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-full h-7 w-7 flex items-center justify-center text-xs">1</span>
+              Configuration Parameters
+            </h2>
 
-        {/* Configuration Form */}
-        <div className="glass-card rounded-xl p-4 sm:p-5 mb-4 fade-in">
-          <h2 className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-            <span className="bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-full h-7 w-7 flex items-center justify-center text-xs">1</span>
-            Configuration Parameters
-          </h2>
+            <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className={`block font-semibold mb-1.5 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Cognito Domain *
+              </label>
+              <input
+                className={`w-full p-2.5 rounded-lg input-field ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-900'}`}
+                placeholder="https://your-domain.auth.region.amazoncognito.com"
+                value={cognitoDomain}
+                onChange={(e) => setCognitoDomain(e.target.value.trim())}
+              />
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={`block font-semibold mb-1.5 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Supported Route Path
+              </label>
+              <select
+                className={`w-full p-2.5 rounded-lg input-field ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-900'}`}
+                value={routePath}
+                onChange={(e) => setRoutePath(e.target.value)}
+              >
+                {ROUTE_PATH_OPTIONS.map((path) => (
+                  <option key={path} value={path}>{path}</option>
+                ))}
+              </select>
+            </div>
+
             {/* response_type */}
             <div>
               <label className={`block font-semibold mb-1.5 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -182,7 +206,7 @@ export default function App() {
             </div>
 
             {/* redirect_uri */}
-            <div className="md:col-span-2">
+            <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className={`block font-semibold text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   Redirect URI *
@@ -210,7 +234,7 @@ export default function App() {
             </div>
 
             {/* scope */}
-            <div className="md:col-span-2">
+            <div>
               <label className={`block font-semibold mb-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                 Scopes
               </label>
@@ -234,7 +258,7 @@ export default function App() {
             </div>
 
             {/* identity_provider */}
-            <div className="md:col-span-2">
+            <div>
               <label className={`block font-semibold mb-1.5 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                 Identity Provider (Optional)
               </label>
@@ -259,45 +283,66 @@ export default function App() {
           >
             Generate Hosted UI URL
           </button>
-        </div>
+          </div>
 
-        {/* Output Section */}
-        {generatedUrl && (
-          <div className="glass-card rounded-xl p-4 sm:p-5 fade-in">
-            <label className={`block font-bold mb-2.5 text-base sm:text-lg flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-              <span className="text-lg">✨</span>
-              Generated URL
-            </label>
-            <textarea
-              className={`w-full p-3 rounded-lg font-mono text-sm mb-3 ${
-                darkMode
-                  ? 'bg-slate-900 text-emerald-300 border border-slate-700'
-                  : 'bg-slate-900 text-emerald-300 border border-slate-300'
-              }`}
-              rows={3}
-              readOnly
-              value={generatedUrl}
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+          <div className="order-1 lg:order-2 lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-4">
+            <div className="glass-card rounded-xl p-4 sm:p-5 fade-in flex-1">
+              <label className={`block font-semibold mb-2.5 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                <span className="text-lg">📋</span>
+                Paste Hosted UI URL
+              </label>
+              <textarea
+                className={`w-full p-3 rounded-lg input-field font-mono text-sm ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-50 text-slate-900'}`}
+                rows={5}
+                placeholder="https://your-domain.auth.region.amazoncognito.com/login?..."
+                value={rawUrl}
+                onChange={(e) => {
+                  setRawUrl(e.target.value);
+                  parseUrl(e.target.value);
+                }}
+              />
+            </div>
+
+            {/* Output Section */}
+            <div className="glass-card rounded-xl p-4 sm:p-5 fade-in flex-1 order-3 lg:order-none">
+              <label className={`block font-bold mb-2.5 text-base sm:text-lg flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                <span className="text-lg">✨</span>
+                Generated URL
+              </label>
+              <textarea
+                className={`w-full p-3 rounded-lg font-mono text-sm mb-3 ${
                   darkMode
-                    ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                    : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                    ? 'bg-slate-900 text-emerald-300 border border-slate-700'
+                    : 'bg-slate-900 text-emerald-300 border border-slate-300'
                 }`}
-                onClick={copyToClipboard}
-              >
-                {copyStatus}
-              </button>
-              <button
-                className="flex-1 btn-primary text-white py-2.5 px-4 rounded-lg font-medium shadow"
-                onClick={() => window.open(generatedUrl, "_blank")}
-              >
-                Open in New Tab
-              </button>
+                rows={5}
+                readOnly
+                placeholder="Generated URL will appear here..."
+                value={generatedUrl}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                    darkMode
+                      ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                      : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                  } ${generatedUrl ? '' : 'opacity-50 cursor-not-allowed'}`}
+                  onClick={copyToClipboard}
+                  disabled={!generatedUrl}
+                >
+                  {copyStatus}
+                </button>
+                <button
+                  className={`flex-1 btn-primary text-white py-2.5 px-4 rounded-lg font-medium shadow ${generatedUrl ? '' : 'opacity-50 cursor-not-allowed'}`}
+                  onClick={() => window.open(generatedUrl, "_blank")}
+                  disabled={!generatedUrl}
+                >
+                  Open in New Tab
+                </button>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Footer */}
